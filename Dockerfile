@@ -44,7 +44,7 @@ COPY project/build.properties /app/project/
 
 # Copy the main scala file
 RUN mkdir -p /app/src/main/scala
-COPY HelloWorld.scala /app/src/main/scala
+COPY ProfileMatmul.scala /app/src/main/scala
 
 RUN sbt update
 
