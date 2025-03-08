@@ -1,10 +1,13 @@
 import breeze.linalg._
+import breeze.linalg.{DenseMatrix => BreezeDenseMatrix}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.linalg.{DenseMatrix => SparkDenseMatrix}
+import scala.util.Random
 
 object ProfileMatmul {
   def main(args: Array[String]): Unit = {
     /*  
-    Implements mat_mul in three different ways and profiles their performance.
+    Implement mat_mul in three different ways and profile their performance.
     */
 
     // Initial parameters
@@ -12,16 +15,14 @@ object ProfileMatmul {
     val matA = Array.fill(1000, 1000)(scala.util.Random.nextDouble())
     val matB = Array.fill(1000, 1000)(scala.util.Random.nextDouble())
 
-    // Preprocessed values
-    val denseMatA = new DenseMatrix(1000, 1000, matA.flatten)
-    val denseMatB = new DenseMatrix(1000, 1000, matB.flatten)
-    var matC1 = Array.ofDim[Double](1000, 1000)
-    var denseMatC2 = new DenseMatrix(1000, 1000, new Array[Double](1000 * 1000))
-    var denseMatC3 = new DenseMatrix(1000, 1000, new Array[Double](1000 * 1000))
+    // Auxiliary variables
     
-    // Method 1: Pure Scala
     var startTime = System.currentTimeMillis()
-    for (ct <- 0 until n) {
+    var endTime = System.currentTimeMillis()
+
+    // Method 1: Pure Scala
+    val multiplyMatrices = (matA: Array[Array[Double]], matB: Array[Array[Double]]) => {
+      val matC1 = Array.ofDim[Double](1000, 1000)
       for (i <- 0 until 1000) {
         for (j <- 0 until 1000) {
           var sum = 0.0
@@ -32,35 +33,35 @@ object ProfileMatmul {
         }
       }
     }
-    var endTime = System.currentTimeMillis()
-    println(s"Pure Scala implementation took ${(endTime-startTime)/n} ms")
+    startTime = System.currentTimeMillis()
+    for (ct <- 0 until n) {
+      multiplyMatrices(matA, matB)
+    }
+    endTime = System.currentTimeMillis()
+    println(s"Pure scala implementation took ${(endTime-startTime)/n} ms")
 
-    /*
+    /**/
     // Method 2: Scala+Spark
-    val spark = SparkSession.builder()
-      .appName("MatrixMultiplication")
-      .master("local[*]")
-      .getOrCreate()
+    val sparkMatA = new SparkDenseMatrix(1000, 1000, matA.flatten)
+    val sparkMatB = new SparkDenseMatrix(1000, 1000, matB.flatten)
+    val spark = SparkSession.builder().appName("MatrixMultiplication").master("local[*]").getOrCreate()
+    val sc = spark.sparkContext
     startTime = System.currentTimeMillis()
     for (ct <- 0 until n) {
-      denseMatC2 = denseMatA.multiply(denseMatB)
+      sparkMatA.multiply(sparkMatB)
     }
     endTime = System.currentTimeMillis()
-    println(s"Scala+Spark implementation took ${(endTime-startTime)/n} ms")
+    println(s"Spark-based implementation took ${(endTime-startTime)/n} ms")
     spark.stop()
-
+    
     // Method 3: Scala+Breeze
+    val breezeMatA = new BreezeDenseMatrix(1000, 1000, matA.flatten)
+    val breezeMatB = new BreezeDenseMatrix(1000, 1000, matB.flatten)
     startTime = System.currentTimeMillis()
     for (ct <- 0 until n) {
-      denseMatC3 = denseMatA * denseMatB
+      breezeMatA*breezeMatB
     }
     endTime = System.currentTimeMillis()
-    println(s"Scala+Breeze implementation took ${(endTime-startTime)/n} ms")
-
-    // All implementations should produce the same result, within acceptable tolerance
-    val denseMatC1 = new DenseMatrix(1000, 1000, matC1.flatten)
-    val tolerance = 1e-3
-    assert (max(denseMatC1-denseMatC2) <= tolerance && max(denseMatC2-denseMatC3) <= tolerance)
-    */
+    println(s"Breeze-based implementation took ${(endTime-startTime)/n} ms")
   }
 }
